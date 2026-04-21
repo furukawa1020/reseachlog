@@ -8,7 +8,7 @@
 
 - Bootstrapping the research log infrastructure and fixing the 2026 research focus
 
-## Research Questions
+## Current Focus
 
 - How should the repository be structured so that daily work can be reused for presentations and papers?
 - What should be fixed first so that the 2026 research plan and day-to-day work stay aligned?
@@ -55,4 +55,3 @@
 - research/H2_dataset_analysis/dataset_registry.md
 - scripts/new_daily_log.py
 - scripts/build_slide_outline.py
-

@@ -11,14 +11,24 @@ ROOT = Path(__file__).resolve().parents[1]
 LOG_ROOT = ROOT / "logs" / "daily"
 OUTPUT_ROOT = ROOT / "slides" / "outlines"
 
+SECTION_FOCUS = "\u4eca\u65e5\u306e\u7126\u70b9"
+SECTION_QUESTION = "\u4eca\u65e5\u306e\u554f\u3044"
+SECTION_ACTIONS = "\u4eca\u65e5\u3084\u3063\u305f\u3053\u3068"
+SECTION_FINDINGS = "\u5f97\u3089\u308c\u305f\u3053\u3068"
+SECTION_SLIDE_NOTES = "\u30b9\u30e9\u30a4\u30c9\u5316\u30e1\u30e2"
+SECTION_BLOCKERS = "\u56f0\u308a\u3054\u3068"
+SECTION_NEXT_STEPS = "\u6b21\u306b\u3084\u308b\u3053\u3068"
+SECTION_ARTIFACTS = "\u53c2\u7167\u30fb\u6210\u679c\u7269"
+
 SECTION_NAMES = [
-    "今日の問い",
-    "今日やったこと",
-    "得られたこと",
-    "スライド化メモ",
-    "困りごと",
-    "次にやること",
-    "参照・成果物",
+    SECTION_FOCUS,
+    SECTION_QUESTION,
+    SECTION_ACTIONS,
+    SECTION_FINDINGS,
+    SECTION_SLIDE_NOTES,
+    SECTION_BLOCKERS,
+    SECTION_NEXT_STEPS,
+    SECTION_ARTIFACTS,
 ]
 
 
@@ -156,8 +166,8 @@ def main() -> int:
         raise SystemExit("No logs found in the requested date range.")
 
     themes: list[str] = []
-    foci: list[str] = []
-    questions: list[str] = []
+    frontmatter_focus: list[str] = []
+    daily_focus: list[str] = []
     actions: list[str] = []
     findings: list[str] = []
     slide_notes: list[str] = []
@@ -167,16 +177,19 @@ def main() -> int:
 
     for path, meta, sections in logs:
         themes.extend(normalize_list(meta.get("themes", [])))
-        focus = str(meta.get("focus", "")).strip()
-        if focus:
-            foci.append(focus)
-        questions.extend(sections["今日の問い"])
-        actions.extend(sections["今日やったこと"])
-        findings.extend(sections["得られたこと"])
-        slide_notes.extend(sections["スライド化メモ"])
-        blockers.extend(sections["困りごと"])
-        next_steps.extend(sections["次にやること"])
-        artifacts.extend(sections["参照・成果物"])
+
+        focus_value = str(meta.get("focus", "")).strip()
+        if focus_value:
+            frontmatter_focus.append(focus_value)
+
+        daily_focus.extend(sections[SECTION_FOCUS])
+        daily_focus.extend(sections[SECTION_QUESTION])
+        actions.extend(sections[SECTION_ACTIONS])
+        findings.extend(sections[SECTION_FINDINGS])
+        slide_notes.extend(sections[SECTION_SLIDE_NOTES])
+        blockers.extend(sections[SECTION_BLOCKERS])
+        next_steps.extend(sections[SECTION_NEXT_STEPS])
+        artifacts.extend(sections[SECTION_ARTIFACTS])
         artifacts.append(path.as_posix().replace(ROOT.as_posix() + "/", ""))
 
     outline = [
@@ -190,10 +203,10 @@ def main() -> int:
         "## Main Focus",
     ]
 
-    for item in unique_keep_order(foci) or ["Focus not recorded"]:
+    for item in unique_keep_order(frontmatter_focus) or ["Focus not recorded"]:
         outline.append(f"- {item}")
 
-    outline.extend(["", "## Research Questions", *[f"- {item}" for item in unique_keep_order(questions) or ["No question recorded"]]])
+    outline.extend(["", "## Daily Focus Notes", *[f"- {item}" for item in unique_keep_order(daily_focus) or ["No focus recorded"]]])
     outline.extend(["", "## What We Did", *[f"- {item}" for item in unique_keep_order(actions) or ["No activity recorded"]]])
     outline.extend(["", "## Key Takeaways", *[f"- {item}" for item in unique_keep_order(findings) or ["No finding recorded"]]])
     outline.extend(["", "## Slide-Ready Notes", *[f"- {item}" for item in unique_keep_order(slide_notes) or ["No slide note recorded"]]])
