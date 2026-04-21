@@ -43,6 +43,8 @@
 `記録は日本語、対外発表のスライドは英語`
 を既定ルールとして扱います。
 
+進捗共有の型は [docs/chat-checkin-template.md](/c:/Projects/prpporsal/docs/chat-checkin-template.md) を使えます。
+
 ## ディレクトリ
 
 ```text

@@ -23,7 +23,7 @@ SECTION_NAMES = [
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build a slide-ready outline from daily logs.")
+    parser = argparse.ArgumentParser(description="Build a slide-outline draft from daily logs.")
     parser.add_argument("--from", dest="date_from", required=True, help="Start date in YYYY-MM-DD.")
     parser.add_argument("--to", dest="date_to", required=True, help="End date in YYYY-MM-DD.")
     parser.add_argument("--title", required=True, help="Title for the outline.")
@@ -182,23 +182,24 @@ def main() -> int:
     outline = [
         f"# {args.title}",
         "",
-        f"- 期間: {start.isoformat()} から {end.isoformat()}",
-        f"- 対象ログ数: {len(logs)}",
-        f"- テーマ: {', '.join(unique_keep_order(themes)) or '未設定'}",
+        f"- Period: {start.isoformat()} to {end.isoformat()}",
+        f"- Source logs: {len(logs)}",
+        f"- Themes: {', '.join(unique_keep_order(themes)) or 'Unspecified'}",
+        "- Note: This is a draft aggregated from research logs. If the source logs are in Japanese, polish the bullets into presentation English before use.",
         "",
-        "## この期間の主題",
+        "## Main Focus",
     ]
 
-    for item in unique_keep_order(foci) or ["主題未記入"]:
+    for item in unique_keep_order(foci) or ["Focus not recorded"]:
         outline.append(f"- {item}")
 
-    outline.extend(["", "## 問い", *[f"- {item}" for item in unique_keep_order(questions) or ["問い未記入"]]])
-    outline.extend(["", "## 実施したこと", *[f"- {item}" for item in unique_keep_order(actions) or ["記録なし"]]])
-    outline.extend(["", "## 得られたこと", *[f"- {item}" for item in unique_keep_order(findings) or ["記録なし"]]])
-    outline.extend(["", "## スライドに載せる材料", *[f"- {item}" for item in unique_keep_order(slide_notes) or ["記録なし"]]])
-    outline.extend(["", "## 詰まりどころ", *[f"- {item}" for item in unique_keep_order(blockers) or ["特記事項なし"]]])
-    outline.extend(["", "## 次の一手", *[f"- {item}" for item in unique_keep_order(next_steps) or ["未記入"]]])
-    outline.extend(["", "## 参照元", *[f"- {item}" for item in unique_keep_order(artifacts)]])
+    outline.extend(["", "## Research Questions", *[f"- {item}" for item in unique_keep_order(questions) or ["No question recorded"]]])
+    outline.extend(["", "## What We Did", *[f"- {item}" for item in unique_keep_order(actions) or ["No activity recorded"]]])
+    outline.extend(["", "## Key Takeaways", *[f"- {item}" for item in unique_keep_order(findings) or ["No finding recorded"]]])
+    outline.extend(["", "## Slide-Ready Notes", *[f"- {item}" for item in unique_keep_order(slide_notes) or ["No slide note recorded"]]])
+    outline.extend(["", "## Blockers", *[f"- {item}" for item in unique_keep_order(blockers) or ["No blocker recorded"]]])
+    outline.extend(["", "## Next Steps", *[f"- {item}" for item in unique_keep_order(next_steps) or ["No next step recorded"]]])
+    outline.extend(["", "## Sources", *[f"- {item}" for item in unique_keep_order(artifacts)]])
     outline.append("")
 
     output_path = Path(args.output) if args.output else default_output_path(end)
