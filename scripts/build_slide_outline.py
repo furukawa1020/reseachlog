@@ -11,25 +11,20 @@ ROOT = Path(__file__).resolve().parents[1]
 LOG_ROOT = ROOT / "logs" / "daily"
 OUTPUT_ROOT = ROOT / "slides" / "outlines"
 
-SECTION_FOCUS = "\u4eca\u65e5\u306e\u7126\u70b9"
-SECTION_QUESTION = "\u4eca\u65e5\u306e\u554f\u3044"
-SECTION_ACTIONS = "\u4eca\u65e5\u3084\u3063\u305f\u3053\u3068"
-SECTION_FINDINGS = "\u5f97\u3089\u308c\u305f\u3053\u3068"
-SECTION_SLIDE_NOTES = "\u30b9\u30e9\u30a4\u30c9\u5316\u30e1\u30e2"
-SECTION_BLOCKERS = "\u56f0\u308a\u3054\u3068"
-SECTION_NEXT_STEPS = "\u6b21\u306b\u3084\u308b\u3053\u3068"
-SECTION_ARTIFACTS = "\u53c2\u7167\u30fb\u6210\u679c\u7269"
+OLD_SECTION_ACTIONS = "今日やったこと"
+OLD_SECTION_FINDINGS = "得られたこと"
+OLD_SECTION_BLOCKERS = "困りごと"
+OLD_SECTION_NEXT_STEPS = "次にやること"
+OLD_SECTION_ARTIFACTS = "参照・成果物"
+OLD_SECTION_SLIDE_NOTES = "スライド化メモ"
 
-SECTION_NAMES = [
-    SECTION_FOCUS,
-    SECTION_QUESTION,
-    SECTION_ACTIONS,
-    SECTION_FINDINGS,
-    SECTION_SLIDE_NOTES,
-    SECTION_BLOCKERS,
-    SECTION_NEXT_STEPS,
-    SECTION_ARTIFACTS,
-]
+SECTION_THIS_WEEK = "前回からの活動 Works in this week"
+SECTION_THIS_WEEK_RESEARCH = "研究概要 Research works"
+SECTION_THIS_WEEK_OTHER = "その他 Other works"
+SECTION_MEMOS = "振り返り・反省事項 Memos"
+SECTION_NEXT_WEEK = "次回までの活動予定 Works in upcoming week"
+SECTION_NEXT_WEEK_RESEARCH = "研究活動 Research works"
+SECTION_NEXT_WEEK_OTHER = "その他 Other works"
 
 
 def parse_args() -> argparse.Namespace:
@@ -92,8 +87,16 @@ def parse_front_matter(text: str) -> tuple[dict[str, object], str]:
     return data, body
 
 
-def parse_sections(body: str) -> dict[str, list[str]]:
-    sections: OrderedDict[str, list[str]] = OrderedDict((name, []) for name in SECTION_NAMES)
+def parse_old_sections(body: str) -> dict[str, list[str]]:
+    section_names = [
+        OLD_SECTION_ACTIONS,
+        OLD_SECTION_FINDINGS,
+        OLD_SECTION_BLOCKERS,
+        OLD_SECTION_NEXT_STEPS,
+        OLD_SECTION_ARTIFACTS,
+        OLD_SECTION_SLIDE_NOTES,
+    ]
+    sections: OrderedDict[str, list[str]] = OrderedDict((name, []) for name in section_names)
     current: str | None = None
 
     for raw_line in body.splitlines():
@@ -116,6 +119,50 @@ def parse_sections(body: str) -> dict[str, list[str]]:
     return sections
 
 
+def parse_weekly_report_sections(body: str) -> dict[str, list[str]]:
+    sections = {
+        "this_week_research": [],
+        "this_week_other": [],
+        "memos": [],
+        "next_week_research": [],
+        "next_week_other": [],
+    }
+
+    current_h2: str | None = None
+    current_h3: str | None = None
+
+    for raw_line in body.splitlines():
+        line = raw_line.rstrip()
+        if line.startswith("## "):
+            current_h2 = line[3:].strip()
+            current_h3 = None
+            continue
+        if line.startswith("### "):
+            current_h3 = line[4:].strip()
+            continue
+
+        stripped = line.strip()
+        if not stripped or not stripped.startswith("- "):
+            continue
+
+        item = stripped[2:].strip()
+        if not item:
+            continue
+
+        if current_h2 == SECTION_THIS_WEEK and current_h3 == SECTION_THIS_WEEK_RESEARCH:
+            sections["this_week_research"].append(item)
+        elif current_h2 == SECTION_THIS_WEEK and current_h3 == SECTION_THIS_WEEK_OTHER:
+            sections["this_week_other"].append(item)
+        elif current_h2 == SECTION_THIS_WEEK and current_h3 == SECTION_MEMOS:
+            sections["memos"].append(item)
+        elif current_h2 == SECTION_NEXT_WEEK and current_h3 == SECTION_NEXT_WEEK_RESEARCH:
+            sections["next_week_research"].append(item)
+        elif current_h2 == SECTION_NEXT_WEEK and current_h3 == SECTION_NEXT_WEEK_OTHER:
+            sections["next_week_other"].append(item)
+
+    return sections
+
+
 def unique_keep_order(values: list[str]) -> list[str]:
     seen: set[str] = set()
     output: list[str] = []
@@ -127,8 +174,8 @@ def unique_keep_order(values: list[str]) -> list[str]:
     return output
 
 
-def collect_logs(start: date, end: date) -> list[tuple[Path, dict[str, object], dict[str, list[str]]]]:
-    collected: list[tuple[Path, dict[str, object], dict[str, list[str]]]] = []
+def collect_logs(start: date, end: date) -> list[tuple[Path, dict[str, object], str]]:
+    collected: list[tuple[Path, dict[str, object], str]] = []
     for path in sorted(LOG_ROOT.glob("*/*.md")):
         text = path.read_text(encoding="utf-8")
         meta, body = parse_front_matter(text)
@@ -138,7 +185,7 @@ def collect_logs(start: date, end: date) -> list[tuple[Path, dict[str, object], 
         except ValueError:
             continue
         if start <= log_date <= end:
-            collected.append((path, meta, parse_sections(body)))
+            collected.append((path, meta, body))
     return collected
 
 
@@ -166,31 +213,44 @@ def main() -> int:
         raise SystemExit("No logs found in the requested date range.")
 
     themes: list[str] = []
-    frontmatter_focus: list[str] = []
-    daily_focus: list[str] = []
-    actions: list[str] = []
-    findings: list[str] = []
-    slide_notes: list[str] = []
-    blockers: list[str] = []
-    next_steps: list[str] = []
+    main_focus: list[str] = []
+    this_week_research: list[str] = []
+    this_week_other: list[str] = []
+    memos: list[str] = []
+    next_week_research: list[str] = []
+    next_week_other: list[str] = []
+    old_actions: list[str] = []
+    old_findings: list[str] = []
+    old_blockers: list[str] = []
+    old_next_steps: list[str] = []
     artifacts: list[str] = []
 
-    for path, meta, sections in logs:
+    for path, meta, body in logs:
         themes.extend(normalize_list(meta.get("themes", [])))
 
         focus_value = str(meta.get("focus", "")).strip()
         if focus_value:
-            frontmatter_focus.append(focus_value)
+            main_focus.append(focus_value)
 
-        daily_focus.extend(sections[SECTION_FOCUS])
-        daily_focus.extend(sections[SECTION_QUESTION])
-        actions.extend(sections[SECTION_ACTIONS])
-        findings.extend(sections[SECTION_FINDINGS])
-        slide_notes.extend(sections[SECTION_SLIDE_NOTES])
-        blockers.extend(sections[SECTION_BLOCKERS])
-        next_steps.extend(sections[SECTION_NEXT_STEPS])
-        artifacts.extend(sections[SECTION_ARTIFACTS])
+        weekly_sections = parse_weekly_report_sections(body)
+        this_week_research.extend(weekly_sections["this_week_research"])
+        this_week_other.extend(weekly_sections["this_week_other"])
+        memos.extend(weekly_sections["memos"])
+        next_week_research.extend(weekly_sections["next_week_research"])
+        next_week_other.extend(weekly_sections["next_week_other"])
+
+        old_sections = parse_old_sections(body)
+        old_actions.extend(old_sections[OLD_SECTION_ACTIONS])
+        old_findings.extend(old_sections[OLD_SECTION_FINDINGS])
+        old_blockers.extend(old_sections[OLD_SECTION_BLOCKERS])
+        old_next_steps.extend(old_sections[OLD_SECTION_NEXT_STEPS])
+        artifacts.extend(old_sections[OLD_SECTION_ARTIFACTS])
         artifacts.append(path.as_posix().replace(ROOT.as_posix() + "/", ""))
+
+    what_we_did = unique_keep_order(this_week_research + old_actions)
+    other_works = unique_keep_order(this_week_other)
+    memo_items = unique_keep_order(memos + old_findings + old_blockers)
+    next_steps = unique_keep_order(next_week_research + next_week_other + old_next_steps)
 
     outline = [
         f"# {args.title}",
@@ -203,15 +263,13 @@ def main() -> int:
         "## Main Focus",
     ]
 
-    for item in unique_keep_order(frontmatter_focus) or ["Focus not recorded"]:
+    for item in unique_keep_order(main_focus) or ["Focus not recorded"]:
         outline.append(f"- {item}")
 
-    outline.extend(["", "## Daily Focus Notes", *[f"- {item}" for item in unique_keep_order(daily_focus) or ["No focus recorded"]]])
-    outline.extend(["", "## What We Did", *[f"- {item}" for item in unique_keep_order(actions) or ["No activity recorded"]]])
-    outline.extend(["", "## Key Takeaways", *[f"- {item}" for item in unique_keep_order(findings) or ["No finding recorded"]]])
-    outline.extend(["", "## Slide-Ready Notes", *[f"- {item}" for item in unique_keep_order(slide_notes) or ["No slide note recorded"]]])
-    outline.extend(["", "## Blockers", *[f"- {item}" for item in unique_keep_order(blockers) or ["No blocker recorded"]]])
-    outline.extend(["", "## Next Steps", *[f"- {item}" for item in unique_keep_order(next_steps) or ["No next step recorded"]]])
+    outline.extend(["", "## Research Works This Period", *[f"- {item}" for item in what_we_did or ["No research activity recorded"]]])
+    outline.extend(["", "## Other Works", *[f"- {item}" for item in other_works or ["No other work recorded"]]])
+    outline.extend(["", "## Memos and Reflections", *[f"- {item}" for item in memo_items or ["No memo recorded"]]])
+    outline.extend(["", "## Planned Next Steps", *[f"- {item}" for item in next_steps or ["No next step recorded"]]])
     outline.extend(["", "## Sources", *[f"- {item}" for item in unique_keep_order(artifacts)]])
     outline.append("")
 
@@ -224,3 +282,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
